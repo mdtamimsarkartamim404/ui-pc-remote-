@@ -1,0 +1,24 @@
+CYD complete package
+====================
+firmware\   PlatformIO project for the ESP32 (open the folder in VS Code + PlatformIO)
+pc_agent\   Windows PC agent, hidden background version (monitor + remote)
+
+A) ESP32 (once):
+   pio run -e cyd_deck_fast -t erase
+   pio run -e cyd_deck_fast -t upload   (80 MHz screen + 40 MHz SD; if the picture sparkles use: -e cyd_deck)
+   Open http://<device-ip>/  -> login admin / admin  -> System tab:
+     - change the panel password, write down the recovery key
+     - PC IP + port 8080 + TOKEN (choose any token, e.g. 12+ characters) -> Save
+
+B) PC (once):
+   Open pc_agent\ and double-click install_autostart.bat
+   Type the SAME token when it asks. Done: no cmd window, starts with Windows.
+
+C) Test: press a key on the CYD. pc_agent\show_log.bat must show "OK  playpause ...".
+   "DENIED (bad token)" = token differs: run set_token.bat and type exactly the web panel token.
+
+D) Sound + lock screen
+   - Web panel > Video / SD: "Include sound" is OFF by default (tick it when you want sound; files up to 60 MB). Old videos have no sound: re-upload them.
+   - Speaker: connect the speaker to the CYD SPEAKER connector (GPIO26). Volume: Display tab slider, or the "-" "+" keys on the lock screen.
+   - Lock screen (Standby) with "Standby = SD slideshow" ON plays the videos by itself. Tap = control strip (back | play | next | vol- | vol+ | unlock).
+   - BOOT button: short press = next picture / lock <-> unlock, hold 1 s = leave the player, hold 10 s = reset web password.
