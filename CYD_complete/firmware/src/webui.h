@@ -192,7 +192,7 @@ h1{font-size:17px;letter-spacing:.01em}
 <label class=sw><input type=checkbox role=switch id=holdSw><span class=trk aria-hidden=true></span><span class=lbl>Hold on uploaded media</span><b class="oo off" aria-hidden=true>OFF</b></label></div>
 <div class=card><h2>Upload image</h2>
 <button type=button id=dzI>Drop an image here, click to choose, or paste (Ctrl+V)</button>
-<input type=file id=fiI accept="image/*" multiple hidden>
+<input type=file id=fiI accept="image/*,.jpg,.jpeg,.jfif,.png,.webp,.bmp,.avif,.heic,.heif,.gif,.svg,.tif,.tiff,.ico" multiple hidden>
 <ul id=uplI aria-label="Image upload progress"></ul>
 <p class=hint>JPG, PNG, WebP, BMP... browser-ei 320x240 e auto convert hoy (CYD). Animated GIF/WebP dile Video tab use koro.</p></div>
 </div></section>
@@ -524,12 +524,24 @@ $('#vq').addEventListener('change',vqHint);
 function fitSize(vw,vh,P){const s=Math.min(P.w/vw,P.h/vh);return[Math.max(8,Math.round(vw*s)&~1),Math.max(8,Math.round(vh*s)&~1)]}
 
 async function imgToRgb5(file,mode){
- const bmp=await createImageBitmap(file);const W=320,H=240;
- let cw=W,ch=H,dx=0,dy=0,dw=W,dh=H,sx=0,sy=0,sw=bmp.width,sh=bmp.height;
- if(mode==='contain'){const s=Math.min(W/bmp.width,H/bmp.height);dw=Math.max(1,Math.round(bmp.width*s));dh=Math.max(1,Math.round(bmp.height*s));cw=dw;ch=dh}
- else if(mode==='cover'){const s=Math.max(W/bmp.width,H/bmp.height);sw=Math.round(W/s);sh=Math.round(H/s);sx=Math.round((bmp.width-sw)/2);sy=Math.round((bmp.height-sh)/2)}
- const c=document.createElement('canvas');c.width=cw;c.height=ch;const x=c.getContext('2d');x.imageSmoothingQuality='high';x.fillStyle='#000';x.fillRect(0,0,cw,ch);
- x.drawImage(bmp,sx,sy,sw,sh,dx,dy,dw,dh);if(bmp.close)bmp.close();
+ /* decode any image the browser knows (jpg/png/webp/bmp/avif/gif/svg/heic on Safari...), EXIF-rotated, with <img> fallback */
+ let bmp=null;
+ try{bmp=await createImageBitmap(file,{imageOrientation:'from-image'})}catch(e1){
+  try{bmp=await createImageBitmap(file)}catch(e2){
+   bmp=await new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{URL.revokeObjectURL(u);ok(im)};im.onerror=()=>{URL.revokeObjectURL(u);no(new Error('This browser cannot read this image format. Open it and save/export as JPG or PNG, then upload again'))};im.src=u})}}
+ const bw=bmp.naturalWidth||bmp.width,bh=bmp.naturalHeight||bmp.height;
+ if(!bw||!bh)throw new Error('Image has no size (empty or broken file)');
+ const W=320,H=240;
+ let cw=W,ch=H,dx=0,dy=0,dw=W,dh=H,sx=0,sy=0,sw=bw,sh=bh;
+ if(mode==='contain'){const s=Math.min(W/bw,H/bh);dw=Math.max(1,Math.round(bw*s));dh=Math.max(1,Math.round(bh*s));cw=dw;ch=dh}
+ else if(mode==='cover'){const s=Math.max(W/bw,H/bh);sw=Math.min(bw,Math.round(W/s));sh=Math.min(bh,Math.round(H/s));sx=Math.round((bw-sw)/2);sy=Math.round((bh-sh)/2)}
+ /* crop (cover) or full source into an exact-size canvas, then step-halving downscale = sharp, no aliasing */
+ const src=document.createElement('canvas');src.width=sw;src.height=sh;const sxc=src.getContext('2d');
+ sxc.fillStyle='#000';sxc.fillRect(0,0,sw,sh);sxc.drawImage(bmp,sx,sy,sw,sh,0,0,sw,sh);if(bmp.close)bmp.close();
+ const c=document.createElement('canvas');c.width=cw;c.height=ch;const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#000';x.fillRect(0,0,cw,ch);
+ if(sw<=dw&&sh<=dh){x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(src,0,0,sw,sh,dx,dy,dw,dh)}
+ else{const t=document.createElement('canvas');t.width=dw;t.height=dh;const tx=t.getContext('2d');dsc(tx,src,sw,sh,dw,dh);x.drawImage(t,dx,dy)}
  const px=x.getImageData(0,0,cw,ch).data;const out=new ArrayBuffer(8+cw*ch*2),dv=new DataView(out);
  new Uint8Array(out).set([82,71,66,53],0);dv.setUint16(4,cw,true);dv.setUint16(6,ch,true);
  /* Floyd-Steinberg dithering to RGB565: no colour banding (much nicer gradients / skin / sky) */
